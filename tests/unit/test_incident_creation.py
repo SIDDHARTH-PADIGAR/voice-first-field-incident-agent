@@ -44,9 +44,8 @@ def setup(tmp_path):
     service.transition_session(
         "SESSION-1", SessionState.ASSET_LOOKUP, access
     )
-    service.transition_session(
-        "SESSION-1", SessionState.READY_FOR_CONFIRMATION, access
-    )
+    service.lookup_asset_by_id("SESSION-1", "PUMP-1", access)
+    service.select_asset("SESSION-1", "SITE-1", "PUMP-1", access)
 
     return database, service, access
 

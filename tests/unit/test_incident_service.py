@@ -45,9 +45,8 @@ def setup(tmp_path):
     service.transition_session(
         "SESSION-1", SessionState.ASSET_LOOKUP, access
     )
-    service.transition_session(
-        "SESSION-1", SessionState.READY_FOR_CONFIRMATION, access
-    )
+    service.lookup_asset_by_id("SESSION-1", "PUMP-1", access)
+    service.select_asset("SESSION-1", "SITE-1", "PUMP-1", access)
 
     return database, service, access
 
@@ -228,7 +227,7 @@ def test_duplicate_asset_registration_is_rejected(setup):
         )
 
 
-def test_database_schema_is_version_two(setup):
+def test_database_schema_is_version_three(setup):
     database, _, _ = setup
 
     with database.connect() as connection:
@@ -240,5 +239,5 @@ def test_database_schema_is_version_two(setup):
             )
         }
 
-    assert version == SCHEMA_VERSION == 2
+    assert version == SCHEMA_VERSION == 3
     assert "confirmation_events" in tables

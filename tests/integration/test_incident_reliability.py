@@ -38,9 +38,8 @@ def setup(tmp_path):
     service.transition_session(
         "SESSION-1", SessionState.ASSET_LOOKUP, access
     )
-    service.transition_session(
-        "SESSION-1", SessionState.READY_FOR_CONFIRMATION, access
-    )
+    service.lookup_asset_by_id("SESSION-1", "PUMP-1", access)
+    service.select_asset("SESSION-1", "SITE-1", "PUMP-1", access)
 
     draft = IncidentDraft(
         session_id="SESSION-1",
@@ -172,8 +171,10 @@ def test_failed_incident_insert_rolls_back_the_entire_submission(setup):
 def test_database_can_reinitialize_after_schema_version_one(setup):
     database, _, _, _, _ = setup
 
-    # Simulate the table/version arrangement of the earlier schema.
+    # Simulate version 1 by removing tables introduced in later versions.
     with database.transaction() as connection:
+        connection.execute("DROP TABLE session_asset_selections")
+        connection.execute("DROP TABLE session_asset_candidates")
         connection.execute("DROP TABLE confirmation_events")
         connection.execute("PRAGMA user_version = 1")
 
@@ -181,12 +182,16 @@ def test_database_can_reinitialize_after_schema_version_one(setup):
 
     with database.connect() as connection:
         version = connection.execute("PRAGMA user_version").fetchone()[0]
-        confirmation_table = connection.execute(
-            """
-            SELECT name FROM sqlite_master
-            WHERE type = 'table' AND name = 'confirmation_events'
-            """
-        ).fetchone()
+        tables = {
+            row["name"]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
 
-    assert version == 2
-    assert confirmation_table is not None
+    assert version == 3
+    assert {
+        "confirmation_events",
+        "session_asset_candidates",
+        "session_asset_selections",
+    } <= tables

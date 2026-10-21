@@ -10,12 +10,17 @@ import uuid
 from field_incident_agent.database import Database
 from field_incident_agent.models import (
     Asset,
+    AssetStatus,
     IncidentDraft,
     IncidentStatus,
     SessionState,
     Severity,
 )
-from field_incident_agent.registry import AccessContext
+from field_incident_agent.registry import (
+    AccessContext,
+    AssetLookupResult,
+    LookupStatus,
+)
 from field_incident_agent.severity_policy import (
     SeverityDecision,
     SeverityPolicy,
@@ -198,7 +203,252 @@ class IncidentService:
             raise IncidentValidationError(
                 "An inactive asset cannot be submitted through this workflow."
             )
+            
+        selection = connection.execute(
+            """
+            SELECT 1 FROM session_asset_selections
+            WHERE session_id = ? AND principal_id = ?
+            AND site_id = ? AND asset_id = ?
+            """,
+            (draft.session_id, access.principal_id, draft.site_id, draft.asset_id),
+        ).fetchone()
 
+        if selection is None:
+            raise IncidentValidationError(
+                "Asset must be selected from an authorized lookup before confirmation."
+            )
+
+    @staticmethod
+    def _require_lookup_state(session) -> None:
+        if SessionState(session["current_state"]) is not SessionState.ASSET_LOOKUP:
+            raise IncidentValidationError(
+                "Session must be in asset_lookup state."
+            )
+
+    @staticmethod
+    def _asset_from_row(row) -> Asset:
+        return Asset(
+            asset_id=row["asset_id"],
+            site_id=row["site_id"],
+            asset_type=row["asset_type"],
+            display_name=row["display_name"],
+            status=AssetStatus(row["status"]),
+        )
+
+    @staticmethod
+    def _make_lookup_result(matches: tuple[Asset, ...]) -> AssetLookupResult:
+        if not matches:
+            status = LookupStatus.NOT_FOUND
+        elif len(matches) == 1:
+            status = LookupStatus.FOUND
+        else:
+            status = LookupStatus.AMBIGUOUS
+
+        return AssetLookupResult(status=status, matches=matches)
+
+    @staticmethod
+    def _store_lookup_candidates(connection, session_id, principal_id, matches):
+        connection.execute(
+            "DELETE FROM session_asset_candidates WHERE session_id = ?",
+            (session_id,),
+        )
+
+        looked_up_at = _timestamp()
+        for asset in matches:
+            connection.execute(
+                """
+                INSERT INTO session_asset_candidates (
+                    session_id, principal_id, site_id, asset_id, looked_up_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    session_id,
+                    principal_id,
+                    asset.site_id,
+                    asset.asset_id,
+                    looked_up_at,
+                ),
+            )
+
+    def lookup_asset_by_id(
+        self,
+        session_id: str,
+        asset_id: str,
+        access: AccessContext,
+    ) -> AssetLookupResult:
+        """Look up an exact asset ID only within authorized sites."""
+        _validate_identifier(asset_id, "asset_id")
+
+        with self.database.transaction() as connection:
+            session = self._require_session(connection, session_id, access)
+            self._require_lookup_state(session)
+
+            site_ids = sorted(access.authorized_site_ids)
+            if not site_ids:
+                rows = ()
+            else:
+                placeholders = ",".join("?" for _ in site_ids)
+                rows = connection.execute(
+                    f"""
+                    SELECT site_id, asset_id, asset_type, display_name, status
+                    FROM assets
+                    WHERE asset_id = ? AND site_id IN ({placeholders})
+                    ORDER BY site_id, asset_id
+                    """,
+                    (asset_id, *site_ids),
+                ).fetchall()
+
+            matches = tuple(self._asset_from_row(row) for row in rows)
+            self._store_lookup_candidates(
+                connection, session_id, access.principal_id, matches
+            )
+            return self._make_lookup_result(matches)
+
+    def search_assets_by_clue(
+        self,
+        session_id: str,
+        site_id: str,
+        clue: str,
+        access: AccessContext,
+    ) -> AssetLookupResult:
+        """Search one authorized site's persistent asset registry."""
+        _validate_identifier(site_id, "site_id")
+
+        if not isinstance(clue, str) or not clue.strip():
+            raise ValueError("Search clue cannot be empty.")
+        if len(clue.strip()) > 300:
+            raise ValueError("Search clue cannot exceed 300 characters.")
+
+        if not isinstance(access, AccessContext):
+            raise TypeError("access must be a trusted AccessContext.")
+
+        if site_id not in access.authorized_site_ids:
+            raise AuthorizationError("Caller is not authorized for this site.")
+
+        with self.database.transaction() as connection:
+            session = self._require_session(connection, session_id, access)
+            self._require_lookup_state(session)
+
+            rows = connection.execute(
+                """
+                SELECT site_id, asset_id, asset_type, display_name, status
+                FROM assets
+                WHERE site_id = ?
+                ORDER BY asset_id
+                """,
+                (site_id,),
+            ).fetchall()
+
+            normalized_clue = clue.strip().casefold()
+            matching_rows = tuple(
+                row for row in rows
+                if normalized_clue in (
+                    f"{row['asset_id']} {row['display_name']} "
+                    f"{row['asset_type']}"
+                ).casefold()
+            )
+
+            matches = tuple(
+                self._asset_from_row(row) for row in matching_rows
+            )
+            self._store_lookup_candidates(
+                connection, session_id, access.principal_id, matches
+            )
+            return self._make_lookup_result(matches)
+
+    def select_asset(
+        self,
+        session_id: str,
+        site_id: str,
+        asset_id: str,
+        access: AccessContext,
+    ) -> Asset:
+        """Select one asset returned by the session's latest authorized lookup."""
+        _validate_identifier(site_id, "site_id")
+        _validate_identifier(asset_id, "asset_id")
+
+        if not isinstance(access, AccessContext):
+            raise TypeError("access must be a trusted AccessContext.")
+
+        if site_id not in access.authorized_site_ids:
+            raise AuthorizationError("Caller is not authorized for this site.")
+
+        with self.database.transaction() as connection:
+            session = self._require_session(connection, session_id, access)
+            self._require_lookup_state(session)
+
+            candidate = connection.execute(
+                """
+                SELECT 1 FROM session_asset_candidates
+                WHERE session_id = ? AND principal_id = ?
+                  AND site_id = ? AND asset_id = ?
+                """,
+                (session_id, access.principal_id, site_id, asset_id),
+            ).fetchone()
+
+            if candidate is None:
+                raise IncidentValidationError(
+                    "Asset was not in the latest authorized lookup results."
+                )
+
+            row = connection.execute(
+                """
+                SELECT site_id, asset_id, asset_type, display_name, status
+                FROM assets WHERE site_id = ? AND asset_id = ?
+                """,
+                (site_id, asset_id),
+            ).fetchone()
+
+            if row is None:
+                raise IncidentValidationError("Selected asset no longer exists.")
+
+            asset = self._asset_from_row(row)
+
+            if asset.status is AssetStatus.INACTIVE:
+                raise IncidentValidationError(
+                    "An inactive asset cannot be selected for this workflow."
+                )
+
+            next_state = transition_session_state(
+                SessionState(session["current_state"]),
+                SessionState.READY_FOR_CONFIRMATION,
+            )
+
+            connection.execute(
+                """
+                INSERT INTO session_asset_selections (
+                    session_id, principal_id, site_id, asset_id, selected_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    principal_id = excluded.principal_id,
+                    site_id = excluded.site_id,
+                    asset_id = excluded.asset_id,
+                    selected_at = excluded.selected_at
+                """,
+                (
+                    session_id,
+                    access.principal_id,
+                    site_id,
+                    asset_id,
+                    _timestamp(),
+                ),
+            )
+
+            connection.execute(
+                "DELETE FROM session_asset_candidates WHERE session_id = ?",
+                (session_id,),
+            )
+            connection.execute(
+                """
+                UPDATE sessions SET current_state = ?, updated_at = ?
+                WHERE session_id = ?
+                """,
+                (next_state.value, _timestamp(), session_id),
+            )
+
+            return asset
     def transition_session(
         self,
         session_id: str,
@@ -217,11 +467,39 @@ class IncidentService:
         with self.database.transaction() as connection:
             session = self._require_session(connection, session_id, access)
             current = SessionState(session["current_state"])
+            
+            if target is SessionState.READY_FOR_CONFIRMATION:
+                selected = connection.execute(
+                    """
+                    SELECT 1 FROM session_asset_selections
+                    WHERE session_id = ? AND principal_id = ?
+                    """,
+                    (session_id, access.principal_id),
+                ).fetchone()
+
+                if selected is None:
+                    raise IncidentValidationError(
+                        "An authorized asset selection is required before confirmation."
+                    )
 
             try:
                 next_state = transition_session_state(current, target)
             except ValueError as exc:
                 raise IncidentValidationError(str(exc)) from exc
+            
+            connection.execute(
+                "DELETE FROM session_asset_candidates WHERE session_id = ?",
+                (session_id,),
+            )
+
+            if target in {
+                SessionState.COLLECTING_DETAILS,
+                SessionState.ASSET_LOOKUP,
+            }:
+                connection.execute(
+                    "DELETE FROM session_asset_selections WHERE session_id = ?",
+                    (session_id,),
+                )
 
             connection.execute(
                 """

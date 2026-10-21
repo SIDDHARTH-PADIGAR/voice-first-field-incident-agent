@@ -6,7 +6,7 @@ import sqlite3
 from typing import Iterator
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _SCHEMA_STATEMENTS = (
     """
@@ -88,6 +88,33 @@ _SCHEMA_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS session_asset_candidates (
+        session_id TEXT NOT NULL REFERENCES sessions(session_id)
+            ON DELETE CASCADE,
+        principal_id TEXT NOT NULL,
+        site_id TEXT NOT NULL,
+        asset_id TEXT NOT NULL,
+        looked_up_at TEXT NOT NULL,
+        PRIMARY KEY (session_id, site_id, asset_id),
+        FOREIGN KEY (site_id, asset_id)
+            REFERENCES assets(site_id, asset_id)
+            ON UPDATE RESTRICT ON DELETE RESTRICT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS session_asset_selections (
+        session_id TEXT PRIMARY KEY REFERENCES sessions(session_id)
+            ON DELETE CASCADE,
+        principal_id TEXT NOT NULL,
+        site_id TEXT NOT NULL,
+        asset_id TEXT NOT NULL,
+        selected_at TEXT NOT NULL,
+        FOREIGN KEY (site_id, asset_id)
+            REFERENCES assets(site_id, asset_id)
+            ON UPDATE RESTRICT ON DELETE RESTRICT
+    )
+    """,
+    """
     CREATE INDEX IF NOT EXISTS idx_incidents_site_status
     ON incidents(site_id, status)
     """,
@@ -153,7 +180,7 @@ class Database:
                 "PRAGMA user_version"
             ).fetchone()[0]
 
-            if version not in (0, 1, SCHEMA_VERSION):
+            if version not in (0, 1, 2, SCHEMA_VERSION):
                 raise RuntimeError(
                     f"Unsupported database schema version: {version}"
                 )
