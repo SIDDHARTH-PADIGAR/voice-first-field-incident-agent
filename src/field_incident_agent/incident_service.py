@@ -507,7 +507,8 @@ class IncidentService:
 
             confirmation = connection.execute(
                 """
-                SELECT proposal_fingerprint, consumed_by_idempotency_key
+                SELECT proposal_fingerprint, confirmed_at,
+                       consumed_by_idempotency_key
                 FROM confirmation_events
                 WHERE confirmation_id = ?
                   AND session_id = ?
@@ -614,7 +615,7 @@ class IncidentService:
                     json.dumps(list(decision.indicators)),
                     decision.severity.value,
                     IncidentStatus.OPEN.value,
-                    confirmation["proposal_fingerprint"],
+                    confirmation["confirmed_at"],
                     draft.time_noticed,
                     draft.operational_impact,
                     now,

@@ -108,6 +108,8 @@ def test_incident_is_persisted_and_session_submitted(setup):
 
     assert incident["status"] == "open"
     assert incident["confirmation_status"] == "confirmed"
+    assert "T" in incident["confirmed_at"]
+    assert incident["confirmed_at"].endswith("+00:00")
     assert json.loads(incident["symptoms_json"]) == ["water pooling"]
     assert session["current_state"] == SessionState.SUBMITTED.value
     assert operation["status"] == "succeeded"
