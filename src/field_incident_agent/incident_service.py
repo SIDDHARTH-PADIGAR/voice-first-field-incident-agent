@@ -218,6 +218,46 @@ class IncidentService:
                 "Asset must be selected from an authorized lookup before confirmation."
             )
 
+    def get_session_state(
+        self,
+        session_id: str,
+        access: AccessContext,
+    ) -> SessionState:
+        """Return the authenticated caller's current session state."""
+        with self.database.connect() as connection:
+            session = self._require_session(connection, session_id, access)
+            return SessionState(session["current_state"])
+
+    def validate_proposal(
+        self,
+        draft: IncidentDraft,
+        access: AccessContext,
+    ) -> SeverityDecision:
+        """Validate a proposal without writing a confirmation or ticket."""
+        if not isinstance(draft, IncidentDraft):
+            raise TypeError("draft must be an IncidentDraft.")
+
+        if not isinstance(access, AccessContext):
+            raise TypeError("access must be a trusted AccessContext.")
+
+        decision = SeverityPolicy.classify(draft.safety_indicators)
+
+        # Safety routing takes priority over normal field validation.
+        if decision.requires_handoff:
+            return decision
+
+        with self.database.connect() as connection:
+            session = self._require_session(
+                connection, draft.session_id, access
+            )
+            if SessionState(session["current_state"]) is not SessionState.READY_FOR_CONFIRMATION:
+                raise IncidentValidationError(
+                    "Session is not ready for proposal confirmation."
+                )
+
+            self._validate_site_and_asset(connection, draft, access)
+
+        return decision
     @staticmethod
     def _require_lookup_state(session) -> None:
         if SessionState(session["current_state"]) is not SessionState.ASSET_LOOKUP:
@@ -376,7 +416,14 @@ class IncidentService:
 
         with self.database.transaction() as connection:
             session = self._require_session(connection, session_id, access)
-            self._require_lookup_state(session)
+            current = SessionState(session["current_state"])
+            if current not in {
+                SessionState.ASSET_LOOKUP,
+                SessionState.AWAITING_CLARIFICATION,
+            }:
+                raise IncidentValidationError(
+                    "Session must be in asset_lookup or awaiting_clarification state."
+                )
 
             candidate = connection.execute(
                 """
@@ -487,15 +534,14 @@ class IncidentService:
             except ValueError as exc:
                 raise IncidentValidationError(str(exc)) from exc
             
-            connection.execute(
-                "DELETE FROM session_asset_candidates WHERE session_id = ?",
-                (session_id,),
-            )
-
             if target in {
                 SessionState.COLLECTING_DETAILS,
                 SessionState.ASSET_LOOKUP,
             }:
+                connection.execute(
+                    "DELETE FROM session_asset_candidates WHERE session_id = ?",
+                    (session_id,),
+                )
                 connection.execute(
                     "DELETE FROM session_asset_selections WHERE session_id = ?",
                     (session_id,),
@@ -595,7 +641,7 @@ class IncidentService:
         draft: IncidentDraft,
         access: AccessContext,
         idempotency_key: str,
-        confirmation_id: str,
+        confirmation_id: str | None = None,
     ) -> IncidentCreationResult:
         """Create one confirmed incident in a single database transaction.
 
@@ -610,7 +656,7 @@ class IncidentService:
             raise TypeError("access must be a trusted AccessContext.")
 
         _validate_identifier(idempotency_key, "idempotency_key")
-        _validate_identifier(confirmation_id, "confirmation_id")
+        if confirmation_id is not None: _validate_identifier(confirmation_id, "confirmation_id")
 
         decision = SeverityPolicy.classify(draft.safety_indicators)
         fingerprint = proposal_fingerprint(
@@ -782,6 +828,11 @@ class IncidentService:
 
             # Recheck authorization and asset status at write time.
             self._validate_site_and_asset(connection, draft, access)
+
+            if confirmation_id is None:
+                raise IncidentValidationError(
+                    "A matching caller confirmation is required."
+                )
 
             confirmation = connection.execute(
                 """

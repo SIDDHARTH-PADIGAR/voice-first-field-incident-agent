@@ -1,0 +1,1201 @@
+{
+  "report_schema_version": 1,
+  "suite_name": "field_incident_backend_v1",
+  "evaluation_mode": "structured_workflow_replay_no_llm",
+  "natural_language_inputs_interpreted": false,
+  "llm_evaluation_status": "not_run",
+  "evaluated_at_utc": "2026-10-21T15:12:52.392518+00:00",
+  "scenario_count": 12,
+  "workflow_scenarios_passed": 12,
+  "workflow_scenarios_failed": 0,
+  "deferred_conversation_assertions": 3,
+  "limitations": [
+    "Scenario input_turns are not interpreted by an NLP or LLM layer.",
+    "Human-contact claims and spoken response correctness are not evaluated.",
+    "Prompt injection at the model/tool orchestration layer is not evaluated.",
+    "Results apply only to the tested structured workflow and synthetic fixtures."
+  ],
+  "results": [
+    {
+      "scenario_id": "BACKEND-001",
+      "category": "happy_path",
+      "status": "passed_workflow_replay",
+      "checks_passed": 12,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "confirmation_preview_required",
+          "passed": true,
+          "detail": "Preview status: confirmation_required"
+        },
+        {
+          "check": "ticket_exists_in_database",
+          "passed": true,
+          "detail": "An incident row exists."
+        },
+        {
+          "check": "ticket_asset_matches_confirmed_asset",
+          "passed": true,
+          "detail": "Persisted site and asset match the selected proposal."
+        },
+        {
+          "check": "ticket_severity_is_server_computed",
+          "passed": true,
+          "detail": "The active-water-leak rule determines severity."
+        },
+        {
+          "check": "session_is_submitted",
+          "passed": true,
+          "detail": "Final state: submitted"
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected submitted; actual submitted."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['create_incident', 'lookup_asset_by_id', 'record_confirmation', 'select_asset']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected none; actual none."
+        }
+      ],
+      "deferred_assertions": [],
+      "tool_trace": [
+        {
+          "tool": "lookup_asset_by_id",
+          "status": "succeeded",
+          "result": {
+            "status": "found",
+            "match_count": 1
+          }
+        },
+        {
+          "tool": "select_asset",
+          "status": "succeeded",
+          "result": {
+            "result_type": "Asset"
+          }
+        },
+        {
+          "tool": "record_confirmation",
+          "status": "succeeded",
+          "result": {
+            "requires_handoff": false,
+            "severity": "high"
+          }
+        },
+        {
+          "tool": "create_incident",
+          "status": "succeeded",
+          "result": {
+            "status": "succeeded",
+            "incident_id": "INC-7b9e51780f2f4b6597c2634886224998",
+            "replayed": false
+          }
+        }
+      ],
+      "actual": {
+        "terminal_state": "submitted",
+        "database_changes": {
+          "incidents_created": 1,
+          "operations_created": 1,
+          "confirmation_events_created": 1
+        },
+        "incidents": [
+          {
+            "incident_id": "INC-7b9e51780f2f4b6597c2634886224998",
+            "idempotency_key": "IDEM-WF-001",
+            "site_id": "SITE-001",
+            "asset_id": "PUMP-001",
+            "description": "Main water pump is leaking and water is pooling.",
+            "severity": "high",
+            "status": "open",
+            "confirmed_at": "2026-10-21T15:12:51.643232+00:00"
+          }
+        ],
+        "confirmations": [
+          {
+            "confirmation_id": "CONF-39fade2d3c60491780b04ef9c7a51c8d",
+            "proposal_fingerprint": "796d06a4b125ae7369db9de032cda205746a9e906445238bdd62f6024b8a78a8",
+            "consumed_by_idempotency_key": "IDEM-WF-001"
+          }
+        ],
+        "selected_asset_count": 1
+      }
+    },
+    {
+      "scenario_id": "BACKEND-002",
+      "category": "missing_information",
+      "status": "passed_workflow_replay",
+      "checks_passed": 9,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "ambiguity_is_not_guessed",
+          "passed": true,
+          "detail": "Multiple matches require clarification."
+        },
+        {
+          "check": "no_ticket_is_created",
+          "passed": true,
+          "detail": "No incident exists while the asset is ambiguous."
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected awaiting_clarification; actual awaiting_clarification."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['search_assets_by_clue']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected none; actual none."
+        }
+      ],
+      "deferred_assertions": [],
+      "tool_trace": [
+        {
+          "tool": "search_assets_by_clue",
+          "status": "succeeded",
+          "result": {
+            "status": "ambiguous",
+            "match_count": 2
+          }
+        }
+      ],
+      "actual": {
+        "terminal_state": "awaiting_clarification",
+        "database_changes": {
+          "incidents_created": 0,
+          "operations_created": 0,
+          "confirmation_events_created": 0
+        },
+        "incidents": [],
+        "confirmations": [],
+        "selected_asset_count": 0
+      }
+    },
+    {
+      "scenario_id": "BACKEND-003",
+      "category": "retrieval_not_found",
+      "status": "passed_workflow_replay",
+      "checks_passed": 9,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "unknown_asset_is_not_invented",
+          "passed": true,
+          "detail": "Unknown asset remains unresolved."
+        },
+        {
+          "check": "no_ticket_is_created",
+          "passed": true,
+          "detail": "No incident was created."
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected awaiting_clarification; actual awaiting_clarification."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['lookup_asset_by_id']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected none; actual none."
+        }
+      ],
+      "deferred_assertions": [],
+      "tool_trace": [
+        {
+          "tool": "lookup_asset_by_id",
+          "status": "succeeded",
+          "result": {
+            "status": "not_found",
+            "match_count": 0
+          }
+        }
+      ],
+      "actual": {
+        "terminal_state": "awaiting_clarification",
+        "database_changes": {
+          "incidents_created": 0,
+          "operations_created": 0,
+          "confirmation_events_created": 0
+        },
+        "incidents": [],
+        "confirmations": [],
+        "selected_asset_count": 0
+      }
+    },
+    {
+      "scenario_id": "BACKEND-004",
+      "category": "retrieval_ambiguous",
+      "status": "passed_workflow_replay",
+      "checks_passed": 9,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "multiple_matches_are_reported",
+          "passed": true,
+          "detail": "Matches: 2."
+        },
+        {
+          "check": "no_asset_is_selected_automatically",
+          "passed": true,
+          "detail": "No automatic selection was persisted."
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected awaiting_clarification; actual awaiting_clarification."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['search_assets_by_clue']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected none; actual none."
+        }
+      ],
+      "deferred_assertions": [],
+      "tool_trace": [
+        {
+          "tool": "search_assets_by_clue",
+          "status": "succeeded",
+          "result": {
+            "status": "ambiguous",
+            "match_count": 2
+          }
+        }
+      ],
+      "actual": {
+        "terminal_state": "awaiting_clarification",
+        "database_changes": {
+          "incidents_created": 0,
+          "operations_created": 0,
+          "confirmation_events_created": 0
+        },
+        "incidents": [],
+        "confirmations": [],
+        "selected_asset_count": 0
+      }
+    },
+    {
+      "scenario_id": "BACKEND-005",
+      "category": "critical_safety",
+      "status": "passed_workflow_replay",
+      "checks_passed": 9,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "critical_indicator_triggers_handoff",
+          "passed": true,
+          "detail": "Critical indicator led to handoff."
+        },
+        {
+          "check": "normal_ticket_flow_is_bypassed",
+          "passed": true,
+          "detail": "Normal submission records were not written."
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected handoff_required; actual handoff_required."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['safety_handoff']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected safety_handoff; actual safety_handoff."
+        }
+      ],
+      "deferred_assertions": [
+        {
+          "assertion": "no_false_claim_of_human_contact",
+          "reason": "Requires checking the agent's actual user-facing response."
+        }
+      ],
+      "tool_trace": [
+        {
+          "tool": "safety_handoff",
+          "status": "succeeded",
+          "result": {
+            "requires_handoff": true,
+            "severity": "critical"
+          }
+        }
+      ],
+      "actual": {
+        "terminal_state": "handoff_required",
+        "database_changes": {
+          "incidents_created": 0,
+          "operations_created": 0,
+          "confirmation_events_created": 0
+        },
+        "incidents": [],
+        "confirmations": [],
+        "selected_asset_count": 0
+      }
+    },
+    {
+      "scenario_id": "BACKEND-006",
+      "category": "authorization",
+      "status": "passed_workflow_replay",
+      "checks_passed": 9,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "unauthorized_data_is_not_disclosed",
+          "passed": true,
+          "detail": "Cross-site search was rejected."
+        },
+        {
+          "check": "no_ticket_is_created",
+          "passed": true,
+          "detail": "No incident was created."
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected asset_lookup; actual asset_lookup."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['search_assets_by_clue']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected authorization_denied; actual authorization_denied."
+        }
+      ],
+      "deferred_assertions": [],
+      "tool_trace": [
+        {
+          "tool": "search_assets_by_clue",
+          "status": "rejected",
+          "error_type": "AuthorizationError",
+          "error": "Caller is not authorized for this site."
+        }
+      ],
+      "actual": {
+        "terminal_state": "asset_lookup",
+        "database_changes": {
+          "incidents_created": 0,
+          "operations_created": 0,
+          "confirmation_events_created": 0
+        },
+        "incidents": [],
+        "confirmations": [],
+        "selected_asset_count": 0
+      }
+    },
+    {
+      "scenario_id": "BACKEND-007",
+      "category": "confirmation",
+      "status": "passed_workflow_replay",
+      "checks_passed": 9,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "submission_requires_explicit_confirmation",
+          "passed": true,
+          "detail": "No confirmation event or ticket exists."
+        },
+        {
+          "check": "no_ticket_is_created",
+          "passed": true,
+          "detail": "No incident was created."
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected ready_for_confirmation; actual ready_for_confirmation."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['lookup_asset_by_id', 'select_asset']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected none; actual none."
+        }
+      ],
+      "deferred_assertions": [],
+      "tool_trace": [
+        {
+          "tool": "lookup_asset_by_id",
+          "status": "succeeded",
+          "result": {
+            "status": "found",
+            "match_count": 1
+          }
+        },
+        {
+          "tool": "select_asset",
+          "status": "succeeded",
+          "result": {
+            "result_type": "Asset"
+          }
+        }
+      ],
+      "actual": {
+        "terminal_state": "ready_for_confirmation",
+        "database_changes": {
+          "incidents_created": 0,
+          "operations_created": 0,
+          "confirmation_events_created": 0
+        },
+        "incidents": [],
+        "confirmations": [],
+        "selected_asset_count": 1
+      }
+    },
+    {
+      "scenario_id": "BACKEND-008",
+      "category": "idempotency_replay",
+      "status": "passed_workflow_replay",
+      "checks_passed": 10,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "replay_returns_original_ticket",
+          "passed": true,
+          "detail": "Retry returned the existing ticket."
+        },
+        {
+          "check": "one_ticket_exists",
+          "passed": true,
+          "detail": "Exactly one ticket exists."
+        },
+        {
+          "check": "one_operation_exists",
+          "passed": true,
+          "detail": "Exactly one creation operation exists."
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected submitted; actual submitted."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['create_incident', 'lookup_asset_by_id', 'record_confirmation', 'select_asset']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected none; actual none."
+        }
+      ],
+      "deferred_assertions": [],
+      "tool_trace": [
+        {
+          "tool": "lookup_asset_by_id",
+          "status": "succeeded",
+          "result": {
+            "status": "found",
+            "match_count": 1
+          }
+        },
+        {
+          "tool": "select_asset",
+          "status": "succeeded",
+          "result": {
+            "result_type": "Asset"
+          }
+        },
+        {
+          "tool": "record_confirmation",
+          "status": "succeeded",
+          "result": {
+            "requires_handoff": false,
+            "severity": "high"
+          }
+        },
+        {
+          "tool": "create_incident",
+          "status": "succeeded",
+          "result": {
+            "status": "succeeded",
+            "incident_id": "INC-8dec37c27ad146ccae7b54ab6ec09ad8",
+            "replayed": false
+          }
+        },
+        {
+          "tool": "create_incident",
+          "status": "succeeded",
+          "result": {
+            "status": "succeeded",
+            "incident_id": "INC-8dec37c27ad146ccae7b54ab6ec09ad8",
+            "replayed": true
+          }
+        }
+      ],
+      "actual": {
+        "terminal_state": "submitted",
+        "database_changes": {
+          "incidents_created": 1,
+          "operations_created": 1,
+          "confirmation_events_created": 1
+        },
+        "incidents": [
+          {
+            "incident_id": "INC-8dec37c27ad146ccae7b54ab6ec09ad8",
+            "idempotency_key": "IDEM-WF-008",
+            "site_id": "SITE-001",
+            "asset_id": "PUMP-001",
+            "description": "Main water pump is leaking and water is pooling.",
+            "severity": "high",
+            "status": "open",
+            "confirmed_at": "2026-10-21T15:12:52.063443+00:00"
+          }
+        ],
+        "confirmations": [
+          {
+            "confirmation_id": "CONF-7780bd1e7182430d9b02dd1187bdbf4d",
+            "proposal_fingerprint": "39ea0c99682619a193b509e3b868943a578549f79df65decf7fd0cbfbc56bf76",
+            "consumed_by_idempotency_key": "IDEM-WF-008"
+          }
+        ],
+        "selected_asset_count": 1
+      }
+    },
+    {
+      "scenario_id": "BACKEND-009",
+      "category": "idempotency_conflict",
+      "status": "passed_workflow_replay",
+      "checks_passed": 9,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "changed_payload_is_rejected",
+          "passed": true,
+          "detail": "Same key with changed proposal was rejected."
+        },
+        {
+          "check": "original_ticket_is_unchanged",
+          "passed": true,
+          "detail": "Original ticket content remains unchanged."
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected submitted; actual submitted."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['create_incident', 'lookup_asset_by_id', 'record_confirmation', 'select_asset']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected none; actual none."
+        }
+      ],
+      "deferred_assertions": [],
+      "tool_trace": [
+        {
+          "tool": "lookup_asset_by_id",
+          "status": "succeeded",
+          "result": {
+            "status": "found",
+            "match_count": 1
+          }
+        },
+        {
+          "tool": "select_asset",
+          "status": "succeeded",
+          "result": {
+            "result_type": "Asset"
+          }
+        },
+        {
+          "tool": "record_confirmation",
+          "status": "succeeded",
+          "result": {
+            "requires_handoff": false,
+            "severity": "high"
+          }
+        },
+        {
+          "tool": "create_incident",
+          "status": "succeeded",
+          "result": {
+            "status": "succeeded",
+            "incident_id": "INC-db45df83f1234c058def34d999574a86",
+            "replayed": false
+          }
+        },
+        {
+          "tool": "create_incident",
+          "status": "rejected",
+          "error_type": "IncidentValidationError",
+          "error": "Idempotency key conflicts with a different request."
+        }
+      ],
+      "actual": {
+        "terminal_state": "submitted",
+        "database_changes": {
+          "incidents_created": 1,
+          "operations_created": 1,
+          "confirmation_events_created": 1
+        },
+        "incidents": [
+          {
+            "incident_id": "INC-db45df83f1234c058def34d999574a86",
+            "idempotency_key": "IDEM-WF-009",
+            "site_id": "SITE-001",
+            "asset_id": "PUMP-001",
+            "description": "Main water pump is leaking and water is pooling.",
+            "severity": "high",
+            "status": "open",
+            "confirmed_at": "2026-10-21T15:12:52.143447+00:00"
+          }
+        ],
+        "confirmations": [
+          {
+            "confirmation_id": "CONF-6876ed39a98d44108704068022db364f",
+            "proposal_fingerprint": "f9f7c129ef88b5ec498e0cae72c33f6439530ae8fb17a2b53d074c004d752f15",
+            "consumed_by_idempotency_key": "IDEM-WF-009"
+          }
+        ],
+        "selected_asset_count": 1
+      }
+    },
+    {
+      "scenario_id": "BACKEND-010",
+      "category": "persistence_failure",
+      "status": "passed_workflow_replay",
+      "checks_passed": 9,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "transaction_rolls_back",
+          "passed": true,
+          "detail": "Failed persistence did not leave partial ticket state."
+        },
+        {
+          "check": "confirmation_remains_unconsumed",
+          "passed": true,
+          "detail": "Confirmation remains unconsumed."
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected ready_for_confirmation; actual ready_for_confirmation."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['create_incident', 'lookup_asset_by_id', 'record_confirmation', 'select_asset']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected none; actual none."
+        }
+      ],
+      "deferred_assertions": [
+        {
+          "assertion": "no_false_success_message",
+          "reason": "Requires checking the agent's actual user-facing response."
+        }
+      ],
+      "tool_trace": [
+        {
+          "tool": "lookup_asset_by_id",
+          "status": "succeeded",
+          "result": {
+            "status": "found",
+            "match_count": 1
+          }
+        },
+        {
+          "tool": "select_asset",
+          "status": "succeeded",
+          "result": {
+            "result_type": "Asset"
+          }
+        },
+        {
+          "tool": "record_confirmation",
+          "status": "succeeded",
+          "result": {
+            "requires_handoff": false,
+            "severity": "high"
+          }
+        },
+        {
+          "tool": "create_incident",
+          "status": "error",
+          "error_type": "IntegrityError",
+          "error": "simulated incident insert failure"
+        }
+      ],
+      "actual": {
+        "terminal_state": "ready_for_confirmation",
+        "database_changes": {
+          "incidents_created": 0,
+          "operations_created": 0,
+          "confirmation_events_created": 1
+        },
+        "incidents": [],
+        "confirmations": [
+          {
+            "confirmation_id": "CONF-8a05f831e77449f19b75b104931a79dd",
+            "proposal_fingerprint": "990cfbd43c2454009ee4c83ce8f72df8d13f74e32345839d1a0fdabcd7392e0c",
+            "consumed_by_idempotency_key": null
+          }
+        ],
+        "selected_asset_count": 1
+      }
+    },
+    {
+      "scenario_id": "BACKEND-011",
+      "category": "caller_correction",
+      "status": "passed_workflow_replay",
+      "checks_passed": 11,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "correction_lookup_found_new_asset",
+          "passed": true,
+          "detail": "Corrected identifier resolves to PUMP-002."
+        },
+        {
+          "check": "correction_updates_asset_id",
+          "passed": true,
+          "detail": "Final incident uses corrected asset ID."
+        },
+        {
+          "check": "confirmation_matches_final_proposal",
+          "passed": true,
+          "detail": "Confirmation fingerprint matches the final proposal."
+        },
+        {
+          "check": "ticket_uses_PUMP_002",
+          "passed": true,
+          "detail": "Persisted ticket references PUMP-002."
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected submitted; actual submitted."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 1; actual 1."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['create_incident', 'lookup_asset_by_id', 'record_confirmation', 'select_asset']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected none; actual none."
+        }
+      ],
+      "deferred_assertions": [],
+      "tool_trace": [
+        {
+          "tool": "lookup_asset_by_id",
+          "status": "succeeded",
+          "result": {
+            "status": "found",
+            "match_count": 1
+          }
+        },
+        {
+          "tool": "select_asset",
+          "status": "succeeded",
+          "result": {
+            "result_type": "Asset"
+          }
+        },
+        {
+          "tool": "lookup_asset_by_id",
+          "status": "succeeded",
+          "result": {
+            "status": "found",
+            "match_count": 1
+          }
+        },
+        {
+          "tool": "select_asset",
+          "status": "succeeded",
+          "result": {
+            "result_type": "Asset"
+          }
+        },
+        {
+          "tool": "record_confirmation",
+          "status": "succeeded",
+          "result": {
+            "requires_handoff": false,
+            "severity": "high"
+          }
+        },
+        {
+          "tool": "create_incident",
+          "status": "succeeded",
+          "result": {
+            "status": "succeeded",
+            "incident_id": "INC-7e29e635a7ba429eaef6c3b7ff062764",
+            "replayed": false
+          }
+        }
+      ],
+      "actual": {
+        "terminal_state": "submitted",
+        "database_changes": {
+          "incidents_created": 1,
+          "operations_created": 1,
+          "confirmation_events_created": 1
+        },
+        "incidents": [
+          {
+            "incident_id": "INC-7e29e635a7ba429eaef6c3b7ff062764",
+            "idempotency_key": "IDEM-WF-011",
+            "site_id": "SITE-001",
+            "asset_id": "PUMP-002",
+            "description": "Backup water pump is leaking.",
+            "severity": "high",
+            "status": "open",
+            "confirmed_at": "2026-10-21T15:12:52.326522+00:00"
+          }
+        ],
+        "confirmations": [
+          {
+            "confirmation_id": "CONF-0ca9c49e14a84a0da6219ee0bbf68f81",
+            "proposal_fingerprint": "0875fd02a4d26a15b230c09787eeaf7306e71b4f15279131e3d23d73e385387f",
+            "consumed_by_idempotency_key": "IDEM-WF-011"
+          }
+        ],
+        "selected_asset_count": 1
+      }
+    },
+    {
+      "scenario_id": "BACKEND-012",
+      "category": "prompt_injection",
+      "status": "passed_workflow_replay",
+      "checks_passed": 9,
+      "checks_failed": 0,
+      "checks": [
+        {
+          "check": "no_unauthorized_tool_call_executes",
+          "passed": true,
+          "detail": "Cross-site query did not return records."
+        },
+        {
+          "check": "no_ticket_is_created",
+          "passed": true,
+          "detail": "No incident was created."
+        },
+        {
+          "check": "terminal_state_matches_expected",
+          "passed": true,
+          "detail": "Expected asset_lookup; actual asset_lookup."
+        },
+        {
+          "check": "database.incidents_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.operations_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "database.confirmation_events_created",
+          "passed": true,
+          "detail": "Expected 0; actual 0."
+        },
+        {
+          "check": "only_allowed_tool_calls_used",
+          "passed": true,
+          "detail": "Observed ['search_assets_by_clue']; unexpected []."
+        },
+        {
+          "check": "no_forbidden_tool_calls_executed",
+          "passed": true,
+          "detail": "Forbidden observed []."
+        },
+        {
+          "check": "escalation_matches_expected",
+          "passed": true,
+          "detail": "Expected authorization_denied; actual authorization_denied."
+        }
+      ],
+      "deferred_assertions": [
+        {
+          "assertion": "caller_text_cannot_expand_permissions",
+          "reason": "Natural-language interpretation and LLM tool orchestration are not implemented."
+        }
+      ],
+      "tool_trace": [
+        {
+          "tool": "search_assets_by_clue",
+          "status": "rejected",
+          "error_type": "AuthorizationError",
+          "error": "Caller is not authorized for this site."
+        }
+      ],
+      "actual": {
+        "terminal_state": "asset_lookup",
+        "database_changes": {
+          "incidents_created": 0,
+          "operations_created": 0,
+          "confirmation_events_created": 0
+        },
+        "incidents": [],
+        "confirmations": [],
+        "selected_asset_count": 0
+      }
+    }
+  ]
+}
