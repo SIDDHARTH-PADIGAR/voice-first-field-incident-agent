@@ -165,3 +165,104 @@ def test_extra_request_fields_are_rejected(tmp_path):
 
     assert response.status_code == 422
     assert table_count(runtime, "incidents") == 0
+
+class FakeAudioTranscriber:
+    def __init__(self, text):
+        self.text = text
+        self.calls = []
+
+    def transcribe(self, audio, *, filename, content_type):
+        self.calls.append((audio, filename, content_type))
+        return self.text
+
+
+def test_voice_turn_transcribes_and_uses_conversation_manager(tmp_path):
+    runtime = build_runtime(
+        tmp_path / "voice-demo.sqlite3",
+        client=FakeClient(extraction()),
+    )
+    transcriber = FakeAudioTranscriber(
+        "The demonstration pump is vibrating and output is reduced."
+    )
+    client = TestClient(
+        create_app(runtime=runtime, audio_transcriber=transcriber)
+    )
+
+    response = client.post(
+        "/api/voice-turn",
+        content=b"synthetic audio bytes",
+        headers={"Content-Type": "audio/webm"},
+    )
+
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["input_mode"] == "audio"
+    assert result["transcript"] == transcriber.text
+    assert result["status"] == "confirmation_required"
+    assert result["conversation_id"]
+    assert transcriber.calls == [
+        (b"synthetic audio bytes", "voice-turn.webm", "audio/webm")
+    ]
+    assert table_count(runtime, "incidents") == 0
+
+
+def test_voice_turn_rejects_unsupported_content_type(tmp_path):
+    runtime = build_runtime(
+        tmp_path / "voice-demo.sqlite3",
+        client=FakeClient(extraction()),
+    )
+    transcriber = FakeAudioTranscriber("This should not be used.")
+    client = TestClient(
+        create_app(runtime=runtime, audio_transcriber=transcriber)
+    )
+
+    response = client.post(
+        "/api/voice-turn",
+        content=b"not audio",
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 415
+    assert transcriber.calls == []
+    assert table_count(runtime, "incidents") == 0
+
+
+def test_voice_turn_rejects_recordings_over_two_megabytes(tmp_path):
+    runtime = build_runtime(
+        tmp_path / "voice-demo.sqlite3",
+        client=FakeClient(extraction()),
+    )
+    transcriber = FakeAudioTranscriber("This should not be used.")
+    client = TestClient(
+        create_app(runtime=runtime, audio_transcriber=transcriber)
+    )
+
+    response = client.post(
+        "/api/voice-turn",
+        content=b"x" * (2 * 1024 * 1024 + 1),
+        headers={"Content-Type": "audio/webm"},
+    )
+
+    assert response.status_code == 413
+    assert transcriber.calls == []
+    assert table_count(runtime, "incidents") == 0
+
+
+def test_voice_turn_rejects_empty_transcription(tmp_path):
+    runtime = build_runtime(
+        tmp_path / "voice-demo.sqlite3",
+        client=FakeClient(extraction()),
+    )
+    transcriber = FakeAudioTranscriber("   ")
+    client = TestClient(
+        create_app(runtime=runtime, audio_transcriber=transcriber)
+    )
+
+    response = client.post(
+        "/api/voice-turn",
+        content=b"synthetic audio bytes",
+        headers={"Content-Type": "audio/webm"},
+    )
+
+    assert response.status_code == 422
+    assert table_count(runtime, "incidents") == 0

@@ -5,7 +5,7 @@ from pathlib import Path
 import secrets
 import uuid
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,10 +20,25 @@ from field_incident_agent.incident_service import IncidentValidationError
 from field_incident_agent.llm_client import ModelClientError
 from field_incident_agent.registry import AccessContext
 from field_incident_agent.runtime import IncidentRuntime, build_runtime
+from field_incident_agent.transcription import (
+    AudioTranscriber,
+    GroqTranscriber,
+    TranscriptionConfigurationError,
+    TranscriptionError,
+)
 
 
 DEFAULT_DATABASE = Path("data/demo/incident_demo.sqlite3")
 MAX_PENDING_PROPOSALS = 100
+MAX_AUDIO_UPLOAD_BYTES = 2 * 1024 * 1024
+SUPPORTED_AUDIO_TYPES = {
+    "audio/webm": (".webm", "audio/webm"),
+    "audio/wav": (".wav", "audio/wav"),
+    "audio/x-wav": (".wav", "audio/wav"),
+    "audio/ogg": (".ogg", "audio/ogg"),
+    "audio/mp4": (".mp4", "audio/mp4"),
+    "audio/mpeg": (".mp3", "audio/mpeg"),
+}
 
 
 class IntakeRequest(BaseModel):
@@ -406,6 +421,7 @@ def create_app(
     *,
     runtime: IncidentRuntime | None = None,
     database_path: str | Path = DEFAULT_DATABASE,
+    audio_transcriber: AudioTranscriber | None = None,
 ) -> FastAPI:
     """Build a local-only app; allow dependency injection for tests."""
     application = FastAPI(
@@ -422,6 +438,9 @@ def create_app(
     runtime_holder = {"value": runtime}
     pending: dict[str, tuple[object, AccessContext, str]] = {}
     conversation_manager_holder: dict[str, ConversationManager | None] = {"value": None}
+    audio_transcriber_holder: dict[str, AudioTranscriber | None] = {
+        "value": audio_transcriber
+    }
 
     def get_runtime() -> IncidentRuntime:
         if runtime_holder["value"] is None:
@@ -445,6 +464,11 @@ def create_app(
             )
         return conversation_manager_holder["value"]
 
+    def get_audio_transcriber() -> AudioTranscriber:
+        if audio_transcriber_holder["value"] is None:
+            audio_transcriber_holder["value"] = GroqTranscriber()
+        return audio_transcriber_holder["value"]
+
     @application.get("/", response_class=HTMLResponse)
     def index() -> str:
         return INDEX_HTML
@@ -466,6 +490,98 @@ def create_app(
                 status_code=409,
                 detail="The intake could not advance safely.",
             ) from exc
+
+    @application.post("/api/voice-turn")
+    async def voice_turn(
+        request: Request,
+        conversation_id: str | None = None,
+    ) -> dict[str, object]:
+        content_type = (
+            request.headers.get("content-type", "")
+            .split(";", 1)[0]
+            .strip()
+            .lower()
+        )
+        audio_type = SUPPORTED_AUDIO_TYPES.get(content_type)
+        if audio_type is None:
+            raise HTTPException(
+                status_code=415,
+                detail=(
+                    "Unsupported audio format. Send WebM, WAV, OGG, MP4, "
+                    "or MP3 audio."
+                ),
+            )
+
+        content_length = request.headers.get("content-length", "")
+        if content_length.isdecimal() and int(content_length) > MAX_AUDIO_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail="Audio recording exceeds the 2 MB limit.",
+            )
+
+        audio = bytearray()
+        async for chunk in request.stream():
+            audio.extend(chunk)
+            if len(audio) > MAX_AUDIO_UPLOAD_BYTES:
+                raise HTTPException(
+                    status_code=413,
+                    detail="Audio recording exceeds the 2 MB limit.",
+                )
+
+        if not audio:
+            raise HTTPException(
+                status_code=422,
+                detail="Audio recording cannot be empty.",
+            )
+
+        extension, normalized_content_type = audio_type
+        try:
+            transcriber = get_audio_transcriber()
+        except TranscriptionConfigurationError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Audio transcription is not configured. Check GROQ_API_KEY "
+                    "and the optional Groq dependency."
+                ),
+            ) from exc
+
+        try:
+            transcript = transcriber.transcribe(
+                bytes(audio),
+                filename=f"voice-turn{extension}",
+                content_type=normalized_content_type,
+            )
+        except TranscriptionError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail="Audio transcription failed. Retry or use text input.",
+            ) from exc
+
+        if not transcript:
+            raise HTTPException(
+                status_code=422,
+                detail="No clear speech was detected. Please try again.",
+            )
+
+        try:
+            result = get_conversation_manager().turn(
+                conversation_id,
+                transcript,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except IncidentValidationError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="The intake could not advance safely.",
+            ) from exc
+
+        return {
+            **result,
+            "input_mode": "audio",
+            "transcript": transcript,
+        }
 
     @application.post("/api/intake")
     def intake(request: IntakeRequest) -> dict[str, object]:
