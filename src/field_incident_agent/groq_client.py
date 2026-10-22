@@ -70,6 +70,13 @@ fields. Never use strings such as "None", "null", "unknown", or "N/A" to
 represent missing values. Use empty arrays when no symptoms or supported
 indicators are present.
 
+CORRECTIONS AND CLARIFICATIONS
+The report may contain an original report followed by a labeled caller
+correction or follow-up. Treat the newest explicit correction as authoritative
+when it conflicts with an earlier detail. Preserve earlier facts that were
+not corrected. Do not treat a correction as a separate incident. Re-extract
+the complete current understanding, including corrected site or asset IDs.
+
 INDICATOR DEFINITIONS
 Map the reported facts to these exact indicator codes:
 
