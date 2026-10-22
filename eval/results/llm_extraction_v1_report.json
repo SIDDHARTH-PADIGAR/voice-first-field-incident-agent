@@ -1,0 +1,129 @@
+{
+  "report_version": "llm_extraction_v1",
+  "created_at": "2026-10-22T02:41:59.180479+00:00",
+  "model": "openai/gpt-oss-20b",
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5
+  },
+  "cases": [
+    {
+      "case_id": "LLM-001-degraded-equipment",
+      "passed": true,
+      "contract_valid": true,
+      "failures": [],
+      "extraction": {
+        "site_id": "SITE-001",
+        "asset_id": "PUMP-104",
+        "asset_lookup_clue": "pump PUMP-104",
+        "description": "pump PUMP-104 is vibrating more than usual and output is reduced. No smoke, leaks, sparks, injury, or immediate danger.",
+        "symptoms": [
+          "vibrating more than usual",
+          "output is reduced"
+        ],
+        "safety_indicators": [
+          "equipment_degraded"
+        ],
+        "safety_concern_uncertain": false,
+        "time_noticed": null,
+        "operational_impact": "output is reduced"
+      },
+      "latency_seconds": 1.82
+    },
+    {
+      "case_id": "LLM-002-repeated-fault",
+      "passed": true,
+      "contract_valid": true,
+      "failures": [],
+      "extraction": {
+        "site_id": "SITE-001",
+        "asset_id": "LIFT-003",
+        "asset_lookup_clue": "elevator LIFT-003",
+        "description": "Elevator LIFT-003 stopped twice in the last hour and restarted each time. It is running now.",
+        "symptoms": [
+          "Stopped twice",
+          "Restarted each time"
+        ],
+        "safety_indicators": [
+          "repeated_fault"
+        ],
+        "safety_concern_uncertain": false,
+        "time_noticed": "last hour",
+        "operational_impact": "Elevator service interrupted briefly, but currently operational."
+      },
+      "latency_seconds": 1.72
+    },
+    {
+      "case_id": "LLM-003-fire-hazard",
+      "passed": true,
+      "contract_valid": true,
+      "failures": [],
+      "extraction": {
+        "site_id": "SITE-001",
+        "asset_id": "PANEL-002",
+        "asset_lookup_clue": "electrical panel PANEL-002",
+        "description": "Electrical panel PANEL-002 at SITE-001 is smoking and visible flames are present. No injuries reported.",
+        "symptoms": [
+          "smoking",
+          "visible flames"
+        ],
+        "safety_indicators": [
+          "fire_or_smoke"
+        ],
+        "safety_concern_uncertain": false,
+        "time_noticed": null,
+        "operational_impact": null
+      },
+      "latency_seconds": 1.31
+    },
+    {
+      "case_id": "LLM-004-active-water-leak",
+      "passed": true,
+      "contract_valid": true,
+      "failures": [],
+      "extraction": {
+        "site_id": "SITE-002",
+        "asset_id": null,
+        "asset_lookup_clue": "ceiling pipe",
+        "description": "At site SITE-002, a ceiling pipe is actively leaking water into an occupied hallway. Water is spreading across the floor.",
+        "symptoms": [
+          "actively leaking water",
+          "water spreading across floor"
+        ],
+        "safety_indicators": [
+          "active_water_leak"
+        ],
+        "safety_concern_uncertain": true,
+        "time_noticed": null,
+        "operational_impact": null
+      },
+      "latency_seconds": 0.96
+    },
+    {
+      "case_id": "LLM-005-ambiguous-asset-and-risk",
+      "passed": true,
+      "contract_valid": true,
+      "failures": [],
+      "extraction": {
+        "site_id": null,
+        "asset_id": null,
+        "asset_lookup_clue": "Near the loading dock",
+        "description": "Something near the loading dock is making a strange noise.",
+        "symptoms": [
+          "strange noise"
+        ],
+        "safety_indicators": [],
+        "safety_concern_uncertain": true,
+        "time_noticed": null,
+        "operational_impact": null
+      },
+      "latency_seconds": 10.19
+    }
+  ],
+  "limitations": [
+    "Synthetic cases only; not production validation.",
+    "Passing means only the assertions defined for each case passed.",
+    "The repeated-elevator safety uncertainty requires review."
+  ]
+}
