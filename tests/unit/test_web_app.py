@@ -266,3 +266,13 @@ def test_voice_turn_rejects_empty_transcription(tmp_path):
 
     assert response.status_code == 422
     assert table_count(runtime, "incidents") == 0
+
+
+def test_home_uses_server_audio_recorder(tmp_path):
+    client, _ = make_client(tmp_path, extraction())
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "setupServerTranscriptionRecorder" in response.text
+    assert "MediaRecorder" in response.text
+    assert "/api/voice-turn" in response.text

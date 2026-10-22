@@ -413,6 +413,189 @@ a synthetic identity and is not suitable for public deployment.</p>
   }
 })();
 </script>
+
+<script>
+(function setupServerTranscriptionRecorder() {
+  const originalStart = document.getElementById("startVoice");
+  const originalStop = document.getElementById("stopVoice");
+  if (!originalStart || !originalStop) {
+    console.error("Voice controls were not found.");
+    return;
+  }
+
+  // Replace the buttons to remove the old browser speech-recognition handlers.
+  const startButton = originalStart.cloneNode(true);
+  const stopButton = originalStop.cloneNode(true);
+  originalStart.replaceWith(startButton);
+  originalStop.replaceWith(stopButton);
+
+  const status = document.getElementById("voiceStatus");
+  const reportField = document.getElementById("report");
+  const maxBytes = 2 * 1024 * 1024;
+
+  startButton.disabled = false;
+  stopButton.disabled = true;
+
+  if (
+    !navigator.mediaDevices ||
+    !navigator.mediaDevices.getUserMedia ||
+    typeof MediaRecorder === "undefined"
+  ) {
+    startButton.disabled = true;
+    status.textContent =
+      "Audio recording is unavailable here. Use localhost or HTTPS, or type your reply.";
+    return;
+  }
+
+  let recorder = null;
+  let stream = null;
+  let chunks = [];
+  let exceededLimit = false;
+  let uploadInProgress = false;
+
+  startButton.addEventListener("click", async () => {
+    if (recorder && recorder.state !== "inactive") return;
+    if (uploadInProgress) return;
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const supportedTypes = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4"
+      ];
+      const preferredType = supportedTypes.find(
+        type => MediaRecorder.isTypeSupported(type)
+      );
+
+      recorder = preferredType
+        ? new MediaRecorder(stream, { mimeType: preferredType })
+        : new MediaRecorder(stream);
+
+      chunks = [];
+      exceededLimit = false;
+
+      recorder.addEventListener("dataavailable", event => {
+        if (event.data && event.data.size > 0) {
+          chunks.push(event.data);
+        }
+
+        const totalBytes = chunks.reduce(
+          (sum, chunk) => sum + chunk.size, 0
+        );
+
+        if (totalBytes > maxBytes) {
+          exceededLimit = true;
+          if (recorder.state !== "inactive") recorder.stop();
+        }
+      });
+
+      recorder.addEventListener("error", () => {
+        status.textContent =
+          "Recording failed. Please try again or type your reply.";
+      });
+
+      recorder.addEventListener("stop", async () => {
+        const activeRecorder = recorder;
+        const blob = new Blob(chunks, {
+          type: activeRecorder.mimeType || "audio/webm"
+        });
+
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          stream = null;
+        }
+
+        stopButton.disabled = true;
+
+        if (exceededLimit || blob.size > maxBytes) {
+          status.textContent =
+            "Recording exceeded the 2 MB limit. Please record a shorter turn.";
+          startButton.disabled = false;
+          chunks = [];
+          return;
+        }
+
+        if (!blob.size) {
+          status.textContent =
+            "No audio was captured. Please try again.";
+          startButton.disabled = false;
+          chunks = [];
+          return;
+        }
+
+        uploadInProgress = true;
+        startButton.disabled = true;
+        status.textContent = "Transcribing your recording...";
+
+        try {
+          const url = new URL("/api/voice-turn", window.location.href);
+
+          if (typeof conversationId !== "undefined" && conversationId) {
+            url.searchParams.set("conversation_id", conversationId);
+          }
+
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": blob.type || "audio/webm"
+            },
+            body: blob
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+            throw new Error(
+              result.detail || "The audio request failed."
+            );
+          }
+
+          if (result.transcript) {
+            addBubble("user", result.transcript);
+            reportField.value = "";
+          }
+
+          showAgentResponse(result);
+          status.textContent =
+            "Turn complete. Start recording again or type a reply.";
+        } catch (error) {
+          status.textContent =
+            error.message || "Audio processing failed. Please try again.";
+        } finally {
+          uploadInProgress = false;
+          startButton.disabled = false;
+          chunks = [];
+        }
+      });
+
+      recorder.start(1000);
+      startButton.disabled = true;
+      stopButton.disabled = false;
+      status.textContent = "Listening. Stop recording when you're done speaking.";
+    } catch (error) {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+
+      startButton.disabled = false;
+      stopButton.disabled = true;
+      status.textContent =
+        "Microphone access failed. Allow microphone access or type your reply.";
+    }
+  });
+
+  stopButton.addEventListener("click", () => {
+    if (recorder && recorder.state !== "inactive") {
+      status.textContent = "Finishing recording...";
+      recorder.stop();
+    }
+  });
+})();
+</script>
+
 </body>
 </html>"""
 
